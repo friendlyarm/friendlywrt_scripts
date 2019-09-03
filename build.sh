@@ -205,7 +205,7 @@ function prepare_image_for_friendlyelec_eflasher(){
 	fi 
 
 	log_info "prepare rootfs.img ..."
-        ./build-rootfs-img.sh ${ROOTFS_DIR} ./${OS_DIR}/rootfs.img 0
+        ./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
 	if [ $? -ne 0 ]; then
                 log_error "error: fail to gen rootfs.img."
                 exit 1
