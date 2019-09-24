@@ -137,7 +137,7 @@ function clean_all(){
 	echo "clean uboot, kernel, friendlywrt, img files"
 	cd $TOP_DIR/u-boot/ && make distclean && cd -
 	cd $TOP_DIR/kernel && make distclean && cd -
-	cd $TOP_DIR/friendlywrt && 
+	cd $TOP_DIR/friendlywrt && make clean && cd -
 	cd ${SDFUSE_DIR} && ./clean.sh && cd -
 }
 
@@ -163,7 +163,7 @@ function prepare_image_for_friendlyelec_eflasher(){
     rm -rf ${SDFUSE_DIR}/out/boot.*
 
     local ROOTFS_DIR=$(mktemp -d ${SDFUSE_DIR}/out/rootfs.XXXXXXXXX)
-    log_info "Copying ${TOP_DIR}/${FRIENDLYWRT_ROOTFS} to ${ROOTFS_DIR}/"
+    log_info "Copying ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS} to ${ROOTFS_DIR}/"
     cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}/* ${ROOTFS_DIR}/
     for (( i=0; i<${#FRIENDLYWRT_FILES[@]}; i++ ));
     do
@@ -186,16 +186,22 @@ function prepare_image_for_friendlyelec_eflasher(){
     local UBOOT_DIR=${TOP_DIR}/u-boot
     local KERNEL_DIR=${TOP_DIR}/kernel
     (cd ${SDFUSE_DIR} && {
-        ./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
+    ./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
 	if [ $? -ne 0 ]; then
                 log_error "error: fail to copy uboot bin file."
                 exit 1
         fi
-        ./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt
+    ./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt
 	if [ $? -ne 0 ]; then
                 log_error "error: fail to copy kernel to rootfs.img."
                 exit 1
-        fi
+    fi
+
+    ./tools/prepare_friendlywrt_kernelmodules.sh ${ROOTFS_DIR}
+	if [ $? -ne 0 ]; then
+                log_error "error: fail to fix kernel module for friendlywrt to rootfs.img."
+                exit 1
+    fi
 
 	log_info "prepare boot.img ..."
         ./build-boot-img.sh ${BOOT_DIR} ./${OS_DIR}/boot.img
@@ -205,7 +211,7 @@ function prepare_image_for_friendlyelec_eflasher(){
 	fi 
 
 	log_info "prepare rootfs.img ..."
-        ./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
+    ./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
 	if [ $? -ne 0 ]; then
                 log_error "error: fail to gen rootfs.img."
                 exit 1
@@ -221,6 +227,7 @@ EOL
     })
 
     # clean
+	log_info "clean ..."
     rm -rf ${ROOTFS_DIR}
     rm -rf ${BOOT_DIR}
 }
