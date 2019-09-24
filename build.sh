@@ -75,10 +75,11 @@ function build_uboot(){
         echo "TARGET_ARCH        = $TARGET_ARCH"
         echo "TARGET_PLAT        = $TARGET_PLAT"
 	echo "TARGET_UBOOT_CONFIG=$TARGET_UBOOT_CONFIG"
+	echo "TARGET_OSNAME	 = $TARGET_OSNAME"
 	echo "========================================="
 
 	(cd ${SDFUSE_DIR} && {
-		DISABLE_MKIMG=1 UBOOT_SRC=${TOP_DIR}/u-boot ./build-uboot.sh friendlywrt_4.14_armhf
+		DISABLE_MKIMG=1 UBOOT_SRC=${TOP_DIR}/u-boot ./build-uboot.sh ${TARGET_OSNAME}
 	})
 
 	if [ $? -eq 0 ]; then
@@ -96,10 +97,11 @@ function build_kernel(){
 	echo "TARGET_ARCH          = $TARGET_ARCH"
         echo "TARGET_PLAT          = $TARGET_PLAT"
 	echo "TARGET_KERNEL_CONFIG = $TARGET_KERNEL_CONFIG"
+	echo "TARGET_OSNAME        = $TARGET_OSNAME"
 	echo "=========================================="
 
 	(cd ${SDFUSE_DIR} && {
-		DISABLE_MKIMG=1 KERNEL_SRC=${TOP_DIR}/kernel ./build-kernel.sh friendlywrt_4.14_armhf
+		DISABLE_MKIMG=1 KERNEL_SRC=${TOP_DIR}/kernel ./build-kernel.sh ${TARGET_OSNAME}
 	})
 
 	if [ $? -eq 0 ]; then
