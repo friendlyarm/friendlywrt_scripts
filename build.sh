@@ -193,7 +193,7 @@ function prepare_image_for_friendlyelec_eflasher(){
                 log_error "error: fail to copy uboot bin file."
                 exit 1
         fi
-    ./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt
+    ./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt ${OS_DIR}
 	if [ $? -ne 0 ]; then
                 log_error "error: fail to copy kernel to rootfs.img."
                 exit 1
