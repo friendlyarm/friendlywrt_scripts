@@ -2,6 +2,9 @@
 
 set -eu
 
+# only for debug
+true ${KEEP_CACHE:=0}
+
 SCRIPTS_DIR=$(cd `dirname $0`; pwd)
 if [ -h $0 ]
 then
@@ -101,7 +104,7 @@ function build_kernel(){
 	echo "=========================================="
 
 	(cd ${SDFUSE_DIR} && {
-		DISABLE_MKIMG=1 KERNEL_SRC=${TOP_DIR}/kernel ./build-kernel.sh ${TARGET_OSNAME}
+		DISABLE_MKIMG=1 KCFG=${TARGET_KERNEL_CONFIG} KERNEL_SRC=${TOP_DIR}/kernel ./build-kernel.sh ${TARGET_OSNAME}
 	})
 
 	if [ $? -eq 0 ]; then
@@ -229,9 +232,18 @@ EOL
     })
 
     # clean
-	log_info "clean ..."
-    rm -rf ${ROOTFS_DIR}
-    rm -rf ${BOOT_DIR}
+    if [ ${KEEP_CACHE} -eq 0 ]; then
+        log_info "clean ..."
+        rm -rf ${ROOTFS_DIR}
+        rm -rf ${BOOT_DIR}
+    else
+        echo "-----------------------------------------"
+        echo "rootfs dir:"
+        echo "    ${ROOTFS_DIR}"
+	echo "boot dir:"
+	echo "    ${BOOT_DIR}"
+        echo "-----------------------------------------"	
+    fi
 }
 
 function clean_device_files()
