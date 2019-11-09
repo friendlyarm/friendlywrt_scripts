@@ -4,6 +4,7 @@ set -eu
 
 # only for debug
 true ${KEEP_CACHE:=0}
+true ${EXTERNAL_ROOTFS_DIR:=}
 
 SCRIPTS_DIR=$(cd `dirname $0`; pwd)
 if [ -h $0 ]
@@ -164,10 +165,13 @@ function prepare_image_for_friendlyelec_eflasher(){
     rm -rf ${SDFUSE_DIR}/${OS_DIR}/*
 
     # clean
-    rm -rf ${SDFUSE_DIR}/out/rootfs.*
     rm -rf ${SDFUSE_DIR}/out/boot.*
 
-    local ROOTFS_DIR=$(mktemp -d ${SDFUSE_DIR}/out/rootfs.XXXXXXXXX)
+    local ROOTFS_DIR=${EXTERNAL_ROOTFS_DIR}
+    if [ -z $ROOTFS_DIR ]; then
+    	rm -rf ${SDFUSE_DIR}/out/rootfs.*
+    	ROOTFS_DIR=$(mktemp -d ${SDFUSE_DIR}/out/rootfs.XXXXXXXXX)
+    fi
     log_info "Copying ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS} to ${ROOTFS_DIR}/"
     cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}/* ${ROOTFS_DIR}/
     for (( i=0; i<${#FRIENDLYWRT_FILES[@]}; i++ ));
