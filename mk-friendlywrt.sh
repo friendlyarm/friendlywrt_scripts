@@ -45,4 +45,10 @@ if [ $RET -eq 0 ]; then
 	exit 0
 fi
 
+make -j1 V=s
+RET=$?
+if [ $RET -eq 0 ]; then
+    exit 0
+fi
+
 exit 1
