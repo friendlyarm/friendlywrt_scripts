@@ -24,11 +24,15 @@ firsttime_usage()
 	echo "# select board: "
 	ALL_MK=`find ./device/friendlyelec -type f -name "*.mk" -printf "%f\n"`
 	for mk in ${ALL_MK}; do
-		echo "  ./build.sh $mk"
+        if [ ${mk} != "base.mk" ]; then
+		    echo "  ./build.sh $mk"
+        fi
 	done
 	ALL_MK_LINK=`find ./device/friendlyelec -type l -name "*.mk" -printf "%f\n"`
         for mk in ${ALL_MK_LINK}; do
+            if [ ${mk} != "base.mk" ]; then
                 echo "  ./build.sh $mk"
+            fi
         done
 	echo ""
 }
