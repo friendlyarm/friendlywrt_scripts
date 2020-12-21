@@ -35,6 +35,8 @@ if [ ! -d dl ]; then
 	echo "dl directory doesn't  exist. Will make download full package from openwrt site."
 fi
 make download -j$(nproc)
+find dl -size -1024c -exec ls -l {} \;
+find dl -size -1024c -exec rm -f {} \;
 
 USING_DATE=$(date +%Y%m%d)
 echo "${USING_DATE}" > ./package/base-files/files/etc/rom-version
