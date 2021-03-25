@@ -199,45 +199,52 @@ function prepare_image_for_friendlyelec_eflasher(){
     local UBOOT_DIR=${TOP_DIR}/u-boot
     local KERNEL_DIR=${TOP_DIR}/kernel
     (cd ${SDFUSE_DIR} && {
-    ./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
-	if [ $? -ne 0 ]; then
+        ./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
+	    if [ $? -ne 0 ]; then
                 log_error "error: fail to copy uboot bin file."
-                exit 1
+                return 1
         fi
-    ./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt ${OS_DIR}
-	if [ $? -ne 0 ]; then
+        ./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt ${OS_DIR}
+	    if [ $? -ne 0 ]; then
                 log_error "error: fail to copy kernel to rootfs.img."
-                exit 1
-    fi
-
-    ./tools/prepare_friendlywrt_kernelmodules.sh ${ROOTFS_DIR}
-	if [ $? -ne 0 ]; then
-                log_error "error: fail to fix kernel module for friendlywrt to rootfs.img."
-                exit 1
-    fi
-
-	log_info "prepare boot.img ..."
-        ./build-boot-img.sh ${BOOT_DIR} ./${OS_DIR}/boot.img
-	if [ $? -ne 0 ]; then
-		log_error "error: fail to gen boot.img."
-		exit 1
-	fi 
-
-	log_info "prepare rootfs.img ..."
-    ./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
-	if [ $? -ne 0 ]; then
-                log_error "error: fail to gen rootfs.img."
-                exit 1
+                return 1
         fi
 
-	cat > ./${OS_DIR}/info.conf << EOL
+        ./tools/prepare_friendlywrt_kernelmodules.sh ${ROOTFS_DIR}
+	    if [ $? -ne 0 ]; then
+                log_error "error: fail to fix kernel module for friendlywrt to rootfs.img."
+                return 1
+        fi
+
+	    log_info "prepare boot.img ..."
+        ./build-boot-img.sh ${BOOT_DIR} ./${OS_DIR}/boot.img
+	    if [ $? -ne 0 ]; then
+		    log_error "error: fail to gen boot.img."
+		    return 1
+	    fi 
+
+	    log_info "prepare rootfs.img ..."
+        ./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
+	    if [ $? -ne 0 ]; then
+            log_error "error: fail to gen rootfs.img."
+            return 1
+        fi
+
+	    cat > ./${OS_DIR}/info.conf << EOL
 title=${OS_DIR}
 require-board=${TARGET_PLAT}
 version=$(date +%Y-%m-%d)
 EOL
         ./tools/update_prebuilt.sh ./${OS_DIR} ./prebuilt
-
+        if [ $? -ne 0 ]; then
+            log_error "error: fail to copy prebuilt images."
+            return 1
+        fi
+        return 0
     })
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
 
     # clean
     if [ ${KEEP_CACHE} -eq 0 ]; then
@@ -252,6 +259,7 @@ EOL
 	echo "    ${BOOT_DIR}"
         echo "-----------------------------------------"	
     fi
+    return 0
 }
 
 function clean_device_files()
