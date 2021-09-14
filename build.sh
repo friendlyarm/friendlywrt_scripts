@@ -49,6 +49,7 @@ usage()
 	echo "  ./build.sh sd-img             -pack sd-card image, used to create bootable SD card"
 	echo "  ./build.sh emmc-img           -pack sd-card image, used to write friendlywrt to emmc"
     echo "# clean"
+    echo "  ./build.sh clean              -remove old images"
     echo "  ./build.sh cleanall"
 	echo ""
 }
@@ -141,6 +142,16 @@ function build_all() {
 	build_kernel
 	build_friendlywrt
 	build_sdimg
+}
+
+function clean_old_images(){
+    (cd $TOP_DIR/out && {
+        rm -f *.img
+        rm -f *.7z
+        rm -f *.zip
+        rm -rf boot.*
+        rm -rf rootfs.*
+    })
 }
 
 function clean_all(){
@@ -329,7 +340,7 @@ function install_toolchain() {
 function build_emmcimg() {
     local ROOTFS=${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}
     prepare_image_for_friendlyelec_eflasher ${TARGET_IMAGE_DIRNAME} ${ROOTFS} && (cd ${SDFUSE_DIR} && {
-	    ./mk-emmc-image.sh ${TARGET_IMAGE_DIRNAME} ${TARGET_EFLASHER_RAW_FILENAME}
+	    ./mk-emmc-image.sh ${TARGET_IMAGE_DIRNAME} ${TARGET_EFLASHER_RAW_FILENAME} autostart=yes
         echo "-----------------------------------------"
         echo "Run the following command for sdcard install:"
         echo "    sudo dd if=out/${TARGET_EFLASHER_RAW_FILENAME} bs=1M of=/dev/sdX"
@@ -389,6 +400,9 @@ else
 	elif [ $BUILD_TARGET == all ];then
 		build_all
 		exit 0
+    elif [ $BUILD_TARGET == clean ];then
+        clean_old_images
+        exit 0
  	elif [ $BUILD_TARGET == cleanall ];then
 		clean_all
 		exit 0
