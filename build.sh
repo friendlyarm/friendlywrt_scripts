@@ -340,6 +340,10 @@ function install_toolchain() {
 function build_emmcimg() {
     local ROOTFS=${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}
     prepare_image_for_friendlyelec_eflasher ${TARGET_IMAGE_DIRNAME} ${ROOTFS} && (cd ${SDFUSE_DIR} && {
+        # auto download eflasher image
+        if [ ! -f "eflasher/partmap.txt" ]; then
+            ./tools/get_rom.sh eflasher
+        fi
 	    ./mk-emmc-image.sh ${TARGET_IMAGE_DIRNAME} filename=${TARGET_EFLASHER_RAW_FILENAME} autostart=yes
         echo "-----------------------------------------"
         echo "Run the following command for sdcard install:"
@@ -404,6 +408,12 @@ else
         clean_old_images
         exit 0
  	elif [ $BUILD_TARGET == cleanall ];then
+	    # Automatically re-run script under sudo if not root
+	    if [ $(id -u) -ne 0 ]; then
+	        echo "Re-running script under sudo..."
+	        sudo "$0" "$@"
+	        exit
+	    fi
 		clean_all
 		exit 0
 	else
