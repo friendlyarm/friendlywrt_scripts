@@ -3,7 +3,7 @@
 set -eu
 
 # only for debug
-true ${KEEP_CACHE:=0}
+true ${KEEP_CACHE:=1}
 true ${EXTERNAL_ROOTFS_DIR:=}
 
 SCRIPTS_DIR=$(cd `dirname $0`; pwd)
