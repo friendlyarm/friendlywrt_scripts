@@ -23,7 +23,21 @@ cd ${TOP_DIR}/${FRIENDLYWRT_SRC_PATHNAME}
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 if [ ! -f .config ]; then
-	cp ${TOP_DIR}/configs/${TARGET_FRIENDLYWRT_CONFIG} .config
+    if [ -d ${TOP_DIR}/configs/${TARGET_FRIENDLYWRT_CONFIG} ]; then
+        CURRPATH=$PWD
+        readonly CURRPATH
+        touch ${CURRPATH}/.config
+        (cd ${TOP_DIR}/configs/${TARGET_FRIENDLYWRT_CONFIG} && {
+			for FILE in $(ls); do
+				if [ -f ${FILE} ]; then
+                    echo "# apply ${FILE} to .config"
+					cat ${FILE} >> ${CURRPATH}/.config
+				fi
+			done
+        })
+    else
+        cp ${TOP_DIR}/configs/${TARGET_FRIENDLYWRT_CONFIG} .config
+    fi
 	make defconfig
 else
 	echo "using .config file"
@@ -41,7 +55,7 @@ find dl -size -1024c -exec rm -f {} \;
 USING_DATE=$(date +%Y%m%d)
 echo "${USING_DATE}" > ./package/base-files/files/etc/rom-version
 
-make -j$(nproc) V=s
+make -j$(nproc)
 RET=$?
 if [ $RET -eq 0 ]; then
 	exit 0
