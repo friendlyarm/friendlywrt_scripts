@@ -189,6 +189,7 @@ function prepare_image_for_friendlyelec_eflasher(){
     fi
     log_info "Copying ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS} to ${ROOTFS_DIR}/"
     cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}/* ${ROOTFS_DIR}/
+    echo "$(date +%Y%m%d)" > ${ROOTFS_DIR}/etc/rom-version
     for (( i=0; i<${#FRIENDLYWRT_FILES[@]}; i++ ));
     do
         # apply patch to rootfs

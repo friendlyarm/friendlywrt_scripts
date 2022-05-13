@@ -52,9 +52,6 @@ make download -j$(nproc)
 find dl -size -1024c -exec ls -l {} \;
 find dl -size -1024c -exec rm -f {} \;
 
-USING_DATE=$(date +%Y%m%d)
-echo "${USING_DATE}" > ./package/base-files/files/etc/rom-version
-
 make -j$(nproc)
 RET=$?
 if [ $RET -eq 0 ]; then
