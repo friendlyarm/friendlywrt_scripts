@@ -121,14 +121,26 @@ function build_kernel(){
 	fi
 }
 
-
 function build_friendlywrt(){
 	# build friendlywrt
 	echo "==========Start build friendlywrt=========="
 	echo "TARGET_FRIENDLYWRT_CONFIG=$TARGET_FRIENDLYWRT_CONFIG"
 	echo "FRIENDLYWRT_SRC=$FRIENDLYWRT_SRC"
 	echo "========================================="
-	/usr/bin/time -f "you take %E to build friendlywrt" $SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC
+
+	if [ ! -f ${TOP_DIR}/${FRIENDLYWRT_SRC}/.config ]; then
+		(cd ${TOP_DIR}/${FRIENDLYWRT_SRC} && {
+			for (( i=0; i<${#FRIENDLYWRT_PATCHS[@]}; i++ ));
+			do
+				if [ ! -z ${FRIENDLYWRT_PATCHS[$i]} ]; then
+					# apply patch to friendlywrt
+					patch -p1 < ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
+				fi
+			done
+		})
+	fi
+
+	/usr/bin/time -f "you take %E to build friendlywrt" $SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC $TARGET_PLAT
 	if [ $? -eq 0 ]; then
 		echo "====Building friendlywrt ok!===="
 	else
@@ -197,7 +209,7 @@ function prepare_image_for_friendlyelec_eflasher(){
             log_info "Applying ${FRIENDLYWRT_FILES[$i]} to ${ROOTFS_DIR}"
 	    if [ -f ${TOP_DIR}/${FRIENDLYWRT_FILES[$i]}/install.sh ]; then
 		(cd ${TOP_DIR}/${FRIENDLYWRT_FILES[$i]} && {
-			./install.sh ${ROOTFS_DIR}
+			TOP_DIR=${TOP_DIR} ./install.sh ${ROOTFS_DIR}
 		})
 	    else
                 rsync -a --no-o --no-g --exclude='.git' ${TOP_DIR}/${FRIENDLYWRT_FILES[$i]}/* ${ROOTFS_DIR}/
@@ -342,7 +354,7 @@ function build_emmcimg() {
     local ROOTFS=${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}
     prepare_image_for_friendlyelec_eflasher ${TARGET_IMAGE_DIRNAME} ${ROOTFS} && (cd ${SDFUSE_DIR} && {
         # auto download eflasher image
-        if [ ! -f "eflasher/partmap.txt" ]; then
+        if [ ! -f "eflasher/rootfs.img" ]; then
             ./tools/get_rom.sh eflasher
         fi
 	    ./mk-emmc-image.sh ${TARGET_IMAGE_DIRNAME} filename=${TARGET_EFLASHER_RAW_FILENAME} autostart=yes
@@ -358,6 +370,7 @@ function build_emmcimg() {
 # These arrays will be populated in the.mk file
 declare -a FRIENDLYWRT_PACKAGES=("")
 declare -a FRIENDLYWRT_FILES=("")
+declare -a FRIENDLYWRT_PATCHS=("")
 
 MK_LINK=".current_config.mk"
 FOUND_MK_FILE=`find device/friendlyelec -name ${1} | wc -l`
