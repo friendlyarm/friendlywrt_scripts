@@ -113,7 +113,7 @@ function build_kernel(){
 	echo "=========================================="
 
 	(cd ${SDFUSE_DIR} && {
-		DISABLE_MKIMG=1 KCFG=${TARGET_KERNEL_CONFIG} KERNEL_SRC=${TOP_DIR}/kernel ./build-kernel.sh ${TARGET_OSNAME}
+		DISABLE_MKIMG=1 KCFG="${TARGET_KERNEL_CONFIG}" KERNEL_SRC=${TOP_DIR}/kernel ./build-kernel.sh ${TARGET_OSNAME}
 	})
 
 	if [ $? -eq 0 ]; then
