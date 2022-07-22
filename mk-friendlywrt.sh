@@ -16,12 +16,6 @@ TARGET_FRIENDLYWRT_CONFIG=$1
 FRIENDLYWRT_SRC_PATHNAME=$2
 TARGET_PLAT=$3
 
-echo "============Start building friendlywrt============"
-echo "TARGET_FRIENDLYWRT_CONFIG = $TARGET_FRIENDLYWRT_CONFIG"
-echo "FRIENDLYWRT_SRC_PATHNAME = $FRIENDLYWRT_SRC_PATHNAME"
-echo "TARGET_PLAT = $TARGET_PLAT"
-echo "=========================================="
-
 ## not use:
 ## rk3328# export SOC_CFLAGS="-march=armv8-a+crypto+crc -mcpu=cortex-a53+crypto+crc -mtune=cortex-a53"
 ## rk3568# export SOC_CFLAGS="-march=armv8-a+crypto+crc -mcpu=cortex-a55+crypto+crc -mtune=cortex-a55"
@@ -36,8 +30,6 @@ make -j1 V=s
 EOF
 chmod 755 make.sh
 
-./scripts/feeds update -a
-./scripts/feeds install -a
 if [ ! -f .config ]; then
 	if [ -d ${TOP_DIR}/configs/${TARGET_FRIENDLYWRT_CONFIG} ]; then
 		CURRPATH=$PWD

@@ -129,19 +129,41 @@ function build_friendlywrt(){
 	echo "==========Start build friendlywrt=========="
 	echo "TARGET_FRIENDLYWRT_CONFIG=$TARGET_FRIENDLYWRT_CONFIG"
 	echo "FRIENDLYWRT_SRC=$FRIENDLYWRT_SRC"
+	echo "TARGET_PLAT=$TARGET_PLAT"
 	echo "========================================="
 
-	if [ ! -f ${TOP_DIR}/${FRIENDLYWRT_SRC}/.config ]; then
-		(cd ${TOP_DIR}/${FRIENDLYWRT_SRC} && {
-			for (( i=0; i<${#FRIENDLYWRT_PATCHS[@]}; i++ ));
-			do
-				if [ ! -z ${FRIENDLYWRT_PATCHS[$i]} ]; then
+	(cd ${FRIENDLYWRT_SRC} && {
+		./scripts/feeds update -a && ./scripts/feeds install -a
+		if [ $? -ne 0 ]; then
+			echo "====Building friendlywrt failed!===="
+			exit 1
+		fi
+	})
+
+	(cd ${TOP_DIR}/${FRIENDLYWRT_SRC} && {
+		for (( i=0; i<${#FRIENDLYWRT_PATCHS[@]}; i++ ));
+		do
+			if [ ! -z ${FRIENDLYWRT_PATCHS[$i]} ]; then
+				OLD_IFS="$IFS"
+				IFS=";"
+				ARR=(${FRIENDLYWRT_PATCHS[$i]})
+				IFS="$OLD_IFS"
+				if [ ${#ARR[@]} -eq 1 ]; then
 					# apply patch to friendlywrt
-					patch -p1 < ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
+					log_info "Applying ${FRIENDLYWRT_PATCHS[$i]} to ${FRIENDLYWRT_SRC}"
+					patch -R -p1 < ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
+				elif [ ${#ARR[@]} -eq 2 ]; then
+					log_info "Applying ${ARR[1]} to ${FRIENDLYWRT_SRC}/${ARR[0]}"
+					# apply patch to sub dir
+					(cd ${ARR[0]} && {
+						patch -R -p1 < ${TOP_DIR}/${ARR[1]}
+					})
+				else
+					echo "failed to apply patch: ${FRIENDLYWRT_PATCHS[$i]}, wrong format, please check it."
 				fi
-			done
-		})
-	fi
+			fi
+		done
+	})
 
 	/usr/bin/time -f "you take %E to build friendlywrt" $SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC $TARGET_PLAT
 	if [ $? -eq 0 ]; then
