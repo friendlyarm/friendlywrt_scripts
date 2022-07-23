@@ -151,12 +151,12 @@ function build_friendlywrt(){
 				if [ ${#ARR[@]} -eq 1 ]; then
 					# apply patch to friendlywrt
 					log_info "Applying ${FRIENDLYWRT_PATCHS[$i]} to ${FRIENDLYWRT_SRC}"
-					patch -R -p1 < ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
+					git am -3 ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
 				elif [ ${#ARR[@]} -eq 2 ]; then
 					log_info "Applying ${ARR[1]} to ${FRIENDLYWRT_SRC}/${ARR[0]}"
 					# apply patch to sub dir
 					(cd ${ARR[0]} && {
-						patch -R -p1 < ${TOP_DIR}/${ARR[1]}
+						git am -3 ${TOP_DIR}/${ARR[1]}
 					})
 				else
 					echo "failed to apply patch: ${FRIENDLYWRT_PATCHS[$i]}, wrong format, please check it."
