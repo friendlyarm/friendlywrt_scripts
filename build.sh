@@ -149,15 +149,26 @@ function build_friendlywrt(){
 				ARR=(${FRIENDLYWRT_PATCHS[$i]})
 				IFS="$OLD_IFS"
 				if [ ${#ARR[@]} -eq 1 ]; then
-					# apply patch to friendlywrt
+					# apply patch to friendlywrt root dir
 					log_info "Applying ${FRIENDLYWRT_PATCHS[$i]} to ${FRIENDLYWRT_SRC}"
 					git am -3 ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
 				elif [ ${#ARR[@]} -eq 2 ]; then
-					log_info "Applying ${ARR[1]} to ${FRIENDLYWRT_SRC}/${ARR[0]}"
 					# apply patch to sub dir
-					(cd ${ARR[0]} && {
-						git am -3 ${TOP_DIR}/${ARR[1]}
-					})
+					if [ -d ${TOP_DIR}/${ARR[1]} ]; then
+						(cd ${TOP_DIR}/${ARR[1]} && {
+							PATCHS=$(ls)
+							cd ${TOP_DIR}/${FRIENDLYWRT_SRC}/${ARR[0]}
+							for FILE in ${PATCHS}; do
+								log_info "Applying ${FILE} to ${PWD}"
+								git am -3 ${TOP_DIR}/${ARR[1]}/${FILE}
+							done
+						})
+					else
+						(cd ${ARR[0]} && {
+							log_info "Applying ${ARR[1]} to ${FRIENDLYWRT_SRC}/${ARR[0]}"
+							git am -3 ${TOP_DIR}/${ARR[1]}
+						})
+					fi
 				else
 					echo "failed to apply patch: ${FRIENDLYWRT_PATCHS[$i]}, wrong format, please check it."
 				fi
