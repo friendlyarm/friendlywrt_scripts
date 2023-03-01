@@ -402,7 +402,10 @@ function install_toolchain() {
 		sudo su -c "mkdir -p /opt/FriendlyARM/toolchain && cat $TOP_DIR/toolchain/gcc-x64/toolchain-6.4-aarch64.tar.gz* | sudo tar xz -C /"
 	fi
 
-
+	if [ ! -d /opt/FriendlyARM/toolchain/11.3-aarch64 ]; then
+		log_info "installing toolchain: aarch-linux-gcc 11.3"
+		sudo su -c "mkdir -p /opt/FriendlyARM/toolchain && tar xf $TOP_DIR/toolchain/gcc-x64/toolchain-11.3-aarch64.tar.xz -C /"
+	fi
 }
 
 function build_emmcimg() {
