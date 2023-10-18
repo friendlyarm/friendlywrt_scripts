@@ -455,7 +455,7 @@ else
 	#=========================
 	# build target
 	#=========================
-	if [ $BUILD_TARGET == uboot ];then
+    if [ $BUILD_TARGET == uboot -o $BUILD_TARGET == u-boot ];then
 		build_uboot
 		exit 0
 	elif [ $BUILD_TARGET == kernel ];then
