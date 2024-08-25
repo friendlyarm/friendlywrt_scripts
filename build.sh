@@ -182,7 +182,7 @@ function build_friendlywrt(){
 	})
 
 	true ${DEBUG_DOT_CONFIG:=0}
-	/usr/bin/time -f "you take %E to build friendlywrt" $SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC $TARGET_PLAT
+	$SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC $TARGET_PLAT
 	if [ $? -eq 0 ]; then
 		if [ $DEBUG_DOT_CONFIG -eq 0 ]; then
 			echo "====Building friendlywrt ok!===="
