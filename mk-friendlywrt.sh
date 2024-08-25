@@ -35,6 +35,20 @@ if [ ! -f .config ]; then
 	fi
 	sed -i -e '/^# CONFIG_PACKAGE_kmod-/d' .config
 	echo CONFIG_ALL_KMODS=y >> .config
+
+	# Fix compilation errors on the arm64 platform
+	if uname -mpi | grep aarch64 >/dev/null; then
+		if [ -e /usr/lib/go ]; then
+			if grep -q "CONFIG_GOLANG_EXTERNAL_BOOTSTRAP_ROOT" .config; then
+				sed -i '/CONFIG_GOLANG_EXTERNAL_BOOTSTRAP_ROOT/d' .config
+			fi
+			echo "CONFIG_GOLANG_EXTERNAL_BOOTSTRAP_ROOT=\"/usr/lib/go\"" >> .config
+		fi
+		if [ ! -e /usr/include/asm ]; then
+			sudo ln -s /usr/include/aarch64-linux-gnu/asm /usr/include/asm
+		fi
+	fi
+
 	make defconfig
 else
 	echo "using .config file"
