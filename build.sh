@@ -90,6 +90,11 @@ function build_uboot(){
 	echo "TARGET_OSNAME	 = $TARGET_OSNAME"
 	echo "========================================="
 
+	if uname -mpi | grep aarch64 >/dev/null; then
+		echo "====Skip U-Boot compilation and use prebuilt files!===="
+		return 0
+	fi
+
 	(cd ${SDFUSE_DIR} && {
 		DISABLE_MKIMG=1 UBOOT_SRC=${TOP_DIR}/u-boot ./build-uboot.sh ${TARGET_OSNAME}
 	})
@@ -278,11 +283,16 @@ function prepare_image_for_friendlyelec_eflasher(){
 	local UBOOT_DIR=${TOP_DIR}/u-boot
 	local KERNEL_DIR=${TOP_DIR}/kernel
 	(cd ${SDFUSE_DIR} && {
-		./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
-		if [ $? -ne 0 ]; then
-			log_error "error: fail to copy uboot bin file."
-			return 1
+		if uname -mpi | grep aarch64 >/dev/null; then
+			./tools/fill_prebuilt_uboot_bin.sh ./${OS_DIR}
+		else
+			./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
+			if [ $? -ne 0 ]; then
+				log_error "error: fail to copy uboot bin file."
+				return 1
+			fi
 		fi
+
 		./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt ${OS_DIR}
 		if [ $? -ne 0 ]; then
 			log_error "error: fail to copy kernel to rootfs.img."
@@ -362,9 +372,11 @@ function build_sdimg(){
 	# log_info "HAS_BUILD_KERN = ${HAS_BUILD_KERN}"
 	# log_info "HAS_BUILD_KERN_MODULES = ${HAS_BUILD_KERN_MODULES}"
 
-	if [ ${HAS_BUILT_UBOOT} -ne 1 ]; then
-		log_error "error: please build u-boot first."
-		exit 1
+	if ! uname -mpi | grep aarch64 >/dev/null; then
+		if [ ${HAS_BUILT_UBOOT} -ne 1 ]; then
+			log_error "error: please build u-boot first."
+			exit 1
+		fi
 	fi
 	
 	if [ ${HAS_BUILD_KERN} -ne 1 ]; then
