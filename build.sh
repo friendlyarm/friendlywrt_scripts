@@ -90,11 +90,6 @@ function build_uboot(){
 	echo "TARGET_OSNAME	 = $TARGET_OSNAME"
 	echo "========================================="
 
-	if uname -mpi | grep aarch64 >/dev/null; then
-		echo "====Skip U-Boot compilation and use prebuilt files!===="
-		return 0
-	fi
-
 	(cd ${SDFUSE_DIR} && {
 		DISABLE_MKIMG=1 UBOOT_SRC=${TOP_DIR}/u-boot ./build-uboot.sh ${TARGET_OSNAME}
 	})
@@ -182,7 +177,7 @@ function build_friendlywrt(){
 	})
 
 	true ${DEBUG_DOT_CONFIG:=0}
-	$SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC $TARGET_PLAT
+	/usr/bin/time -f "you take %E to build friendlywrt" $SCRIPTS_DIR/mk-friendlywrt.sh $TARGET_FRIENDLYWRT_CONFIG $FRIENDLYWRT_SRC $TARGET_PLAT
 	if [ $? -eq 0 ]; then
 		if [ $DEBUG_DOT_CONFIG -eq 0 ]; then
 			echo "====Building friendlywrt ok!===="
@@ -283,16 +278,11 @@ function prepare_image_for_friendlyelec_eflasher(){
 	local UBOOT_DIR=${TOP_DIR}/u-boot
 	local KERNEL_DIR=${TOP_DIR}/kernel
 	(cd ${SDFUSE_DIR} && {
-		if uname -mpi | grep aarch64 >/dev/null; then
-			./tools/fill_prebuilt_uboot_bin.sh ./${OS_DIR}
-		else
-			./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
-			if [ $? -ne 0 ]; then
-				log_error "error: fail to copy uboot bin file."
-				return 1
-			fi
+		./tools/update_uboot_bin.sh ${UBOOT_DIR} ./${OS_DIR}
+		if [ $? -ne 0 ]; then
+			log_error "error: fail to copy uboot bin file."
+			return 1
 		fi
-
 		./tools/setup_boot_and_rootfs.sh ${UBOOT_DIR} ${KERNEL_DIR} ${BOOT_DIR} ${ROOTFS_DIR} ./prebuilt ${OS_DIR}
 		if [ $? -ne 0 ]; then
 			log_error "error: fail to copy kernel to rootfs.img."
@@ -305,18 +295,82 @@ function prepare_image_for_friendlyelec_eflasher(){
 			return 1
 		fi
 
-		log_info "prepare boot.img ..."
-		./build-boot-img.sh ${BOOT_DIR} ./${OS_DIR}/boot.img
-		if [ $? -ne 0 ]; then
-			log_error "error: fail to gen boot.img."
-			return 1
-		fi 
+		# If Docker is configured, create a new partition and mount it to the /opt directory
+		if [[ "${TARGET_FRIENDLYWRT_CONFIG}" == *docker* ]]; then
+			if [ -f ./tools/make-img.sh ]; then
+				log_info "prepare opt.img ..."
+				./tools/make-img.sh ${ROOTFS_DIR}/opt opt.img ${OS_DIR}
+				if [ $? -eq 0 ]; then
+					if [ -f /tmp/make-img-sh-result ]; then
+						source /tmp/make-img-sh-result
+						if [ -n "${UUID}" ]; then
+							rm -rf ${ROOTFS_DIR}/opt/*
+							# auto mount partion as /opt
+							cat > ${ROOTFS_DIR}/etc/uci-defaults/99-auto-resize-and-mount-opt << EOL
+#!/bin/bash
+. /lib/functions/uci-defaults.sh
+
+# resizefs
+if command -v parted >/dev/null -a \
+    command -v resize2fs >/dev/null; then
+	PART=\$(blkid -U "$UUID")
+	DISK=\${PART%p*}
+	PARTNUM=\${PART#\${DISK}p}
+
+	if [ -b "\${DISK}" -a -n "\${PARTNUM}" ]; then
+		parted \$DISK resizepart \$PARTNUM 100%
+		resize2fs -f \${PART}
+	fi
+fi
+
+FOUND=0
+MOUNT_POINTS=\$(uci show fstab | grep ".uuid=" | cut -d'[' -f2 | cut -d']' -f1)
+for INDEX in \$MOUNT_POINTS; do
+	UUID=\$(uci get fstab.@mount[\$INDEX].uuid 2>/dev/null)
+	if [ "\$UUID" == "${UUID}" ]; then
+		FOUND=1
+		uci set fstab.@mount[\$INDEX].target="/opt"
+		uci set fstab.@mount[\$INDEX].enabled='1'
+		uci commit fstab
+		/etc/init.d/fstab reload
+		break
+	fi
+done
+
+if [ \$FOUND -eq 0 ]; then
+	uci add fstab mount
+	uci set fstab.@mount[-1].target='/opt'
+	uci set fstab.@mount[-1].uuid='${UUID}'
+	uci set fstab.@mount[-1].enabled='1'
+	uci commit fstab
+fi
+
+exit 0
+EOL
+							chmod 0600 ${ROOTFS_DIR}/etc/uci-defaults/99-auto-resize-and-mount-opt
+						else
+							echo "error: fail to get uuid."
+						fi
+					fi
+				fi
+			fi
+		fi
 
 		log_info "prepare rootfs.img ..."
 		./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
 		if [ $? -ne 0 ]; then
 			log_error "error: fail to gen rootfs.img."
 			return 1
+		fi
+
+		# no need to generate boot.img for rockchip
+		if [ ! -f prebuilt/parameter.template ]; then
+			log_info "prepare boot.img ..."
+			./build-boot-img.sh ${BOOT_DIR} ./${OS_DIR}/boot.img
+			if [ $? -ne 0 ]; then
+				log_error "error: fail to gen boot.img."
+				return 1
+			fi
 		fi
 
 		cat > ./${OS_DIR}/info.conf << EOL
@@ -329,6 +383,7 @@ EOL
 			log_error "error: fail to copy prebuilt images."
 			return 1
 		fi
+
 		return 0
 	})
 	if [ $? -ne 0 ]; then
@@ -372,11 +427,9 @@ function build_sdimg(){
 	# log_info "HAS_BUILD_KERN = ${HAS_BUILD_KERN}"
 	# log_info "HAS_BUILD_KERN_MODULES = ${HAS_BUILD_KERN_MODULES}"
 
-	if ! uname -mpi | grep aarch64 >/dev/null; then
-		if [ ${HAS_BUILT_UBOOT} -ne 1 ]; then
-			log_error "error: please build u-boot first."
-			exit 1
-		fi
+	if [ ${HAS_BUILT_UBOOT} -ne 1 ]; then
+		log_error "error: please build u-boot first."
+		exit 1
 	fi
 	
 	if [ ${HAS_BUILD_KERN} -ne 1 ]; then
