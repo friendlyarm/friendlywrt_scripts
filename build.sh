@@ -16,7 +16,8 @@ cd ../
 TOP_DIR=$(pwd)
 
 SDFUSE_DIR=$TOP_DIR/scripts/sd-fuse
-# These arrays will be populated in the.mk file
+# The values of these variables will be overwritten in the.mk file
+true ${ENABLE_OPT_PARTITION:=true}
 true ${FRIENDLYWRT_PACKAGE_DIR:=}
 declare -a FRIENDLYWRT_FILES=("")
 declare -a FRIENDLYWRT_PATCHS=("")
@@ -265,10 +266,10 @@ function prepare_image_for_friendlyelec_eflasher(){
 		log_error "pkg_dir is empty, why?"
 		exit 1
 	else
-		[ -d ${ROOTFS_DIR}/opt ] || mkdir ${ROOTFS_DIR}/opt
-		cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${PKG_DIR} ${ROOTFS_DIR}/opt/
-		sed -i -e '/file\:\/\/opt\/$(basename ${PKG_DIR})/d' ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
-		echo "src/gz friendlywrt_packages file://opt/$(basename ${PKG_DIR})" >> ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
+		[ -d ${ROOTFS_DIR}/usr/local ] || mkdir ${ROOTFS_DIR}/usr/local
+		cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${PKG_DIR} ${ROOTFS_DIR}/usr/local
+		sed -i -e '/file\:\/\/usr\/local\/$(basename ${PKG_DIR})/d' ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
+		echo "src/gz friendlywrt_packages file://usr/local/$(basename ${PKG_DIR})" >> ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
 		sed -i '/check_signature/d' ${ROOTFS_DIR}/etc/opkg.conf
 	fi
 
@@ -295,10 +296,11 @@ function prepare_image_for_friendlyelec_eflasher(){
 			return 1
 		fi
 
-		# If Docker is configured, create a new partition and mount it to the /opt directory
-		if [[ "${TARGET_FRIENDLYWRT_CONFIG}" == *docker* ]]; then
+		if [ "${ENABLE_OPT_PARTITION}" = "true" ]; then
+			# create a new partition and mount it to the /opt directory
 			if [ -f ./tools/make-img.sh ]; then
 				log_info "prepare opt.img ..."
+				[ -d ${ROOTFS_DIR}/opt ] || mkdir ${ROOTFS_DIR}/opt
 				./tools/make-img.sh ${ROOTFS_DIR}/opt opt.img ${OS_DIR}
 				if [ $? -eq 0 ]; then
 					if [ -f /tmp/make-img-sh-result ]; then
@@ -317,8 +319,15 @@ if command -v parted >/dev/null -a \
 	DISK=\${PART%p*}
 	PARTNUM=\${PART#\${DISK}p}
 
+	if command -v sfdisk >/dev/null; then
+		if sfdisk -l \${DISK} 2>&1 | grep -q "GPT PMBR size mismatch"; then
+			echo "write" | sfdisk \${DISK} -q --force 2>/dev/null
+		fi
+	fi
+
 	if [ -b "\${DISK}" -a -n "\${PARTNUM}" ]; then
 		parted \$DISK resizepart \$PARTNUM 100%
+		e2fsck -fy \${PART}
 		resize2fs -f \${PART}
 	fi
 fi
@@ -353,11 +362,16 @@ EOL
 						fi
 					fi
 				fi
+			else
+				ENABLE_OPT_PARTITION=false
+				log_warn "warning: no make-img.sh script, skip to create opt.img."
 			fi
 		fi
 
 		log_info "prepare rootfs.img ..."
-		./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} 0
+		ENABLE_OPT_PARTITION=${ENABLE_OPT_PARTITION} ./build-rootfs-img.sh ${ROOTFS_DIR} ${OS_DIR} \
+			$((TARGET_ROOTFS_PARTSIZE * 1024 * 1024)) \
+			$((TARGET_USERDATA_PARTSIZE * 1024 * 1024))
 		if [ $? -ne 0 ]; then
 			log_error "error: fail to gen rootfs.img."
 			return 1
@@ -444,7 +458,7 @@ function build_sdimg(){
 
 	local ROOTFS=${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}
 	prepare_image_for_friendlyelec_eflasher ${TARGET_IMAGE_DIRNAME} ${ROOTFS} && (cd ${SDFUSE_DIR} && {
-	./mk-sd-image.sh ${TARGET_IMAGE_DIRNAME} ${TARGET_SD_RAW_FILENAME}
+	RAW_SIZE_MB=${TARGET_SD_IMAGESIZE} ./mk-sd-image.sh ${TARGET_IMAGE_DIRNAME} ${TARGET_SD_RAW_FILENAME}
 		(cd out && {
 		rm -f ${TARGET_SD_RAW_FILENAME}.gz
 		gzip --keep ${TARGET_SD_RAW_FILENAME}
