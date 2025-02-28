@@ -312,47 +312,46 @@ function prepare_image_for_friendlyelec_eflasher(){
 #!/bin/bash
 . /lib/functions/uci-defaults.sh
 
-# resizefs
-if command -v parted >/dev/null -a \
-    command -v resize2fs >/dev/null; then
-	PART=\$(blkid -U "$UUID")
-	DISK=\${PART%p*}
-	PARTNUM=\${PART#\${DISK}p}
+if ! command -v parted >/dev/null || ! command -v resize2fs >/dev/null; then
+	logger -t \$0 "Error: 'parted' and/or 'resize2fs' commands are required but not found. Exiting."
+	exit 1
+fi
 
-	if command -v sfdisk >/dev/null; then
-		if sfdisk -l \${DISK} 2>&1 | grep -q "GPT PMBR size mismatch"; then
-			echo "write" | sfdisk \${DISK} -q --force 2>/dev/null
-		fi
-	fi
+UUID="$UUID"
+PART=\$(blkid -U "\$UUID")
+DISK=\${PART%p*}
+PARTNUM=\${PART#\${DISK}p}
 
-	if [ -b "\${DISK}" -a -n "\${PARTNUM}" ]; then
-		parted \$DISK resizepart \$PARTNUM 100%
-		e2fsck -fy \${PART}
-		resize2fs -f \${PART}
+if [ ! -b "\${DISK}" ] || [ -z "\${PARTNUM}" ]; then
+	logger -t \$0 "Error: Unable to retrieve disk information for UUID '${UUID}'. Exiting."
+	exit 1
+fi
+
+if command -v sfdisk >/dev/null; then
+	if sfdisk -l \${DISK} 2>&1 | grep -q "GPT PMBR size mismatch"; then
+		echo "write" | sfdisk \${DISK} -q --force 2>/dev/null
 	fi
 fi
 
-FOUND=0
-MOUNT_POINTS=\$(uci show fstab | grep ".uuid=" | cut -d'[' -f2 | cut -d']' -f1)
-for INDEX in \$MOUNT_POINTS; do
-	UUID=\$(uci get fstab.@mount[\$INDEX].uuid 2>/dev/null)
-	if [ "\$UUID" == "${UUID}" ]; then
-		FOUND=1
-		uci set fstab.@mount[\$INDEX].target="/opt"
-		uci set fstab.@mount[\$INDEX].enabled='1'
-		uci commit fstab
-		/etc/init.d/fstab reload
-		break
-	fi
-done
+# resizefs opt partition
+parted \$DISK resizepart \$PARTNUM 100%
+e2fsck -fy \${PART}
+resize2fs -f \${PART}
 
-if [ \$FOUND -eq 0 ]; then
-	uci add fstab mount
-	uci set fstab.@mount[-1].target='/opt'
-	uci set fstab.@mount[-1].uuid='${UUID}'
-	uci set fstab.@mount[-1].enabled='1'
-	uci commit fstab
+# refresh partition UUID
+if command -v tune2fs >/dev/null; then
+	tune2fs -U random \${PART}
+	UUID=\$(blkid -o value -s UUID \${PART})
 fi
+
+# delete all fstab entries
+while uci -q del fstab.@mount[-1]; do true; done
+
+uci add fstab mount
+uci set fstab.@mount[-1].target="/opt"
+uci set fstab.@mount[-1].uuid="\${UUID}"
+uci set fstab.@mount[-1].enabled="1"
+uci commit fstab
 
 exit 0
 EOL
@@ -534,7 +533,7 @@ else
 	#=========================
 	# build target
 	#=========================
-    if [ $BUILD_TARGET == uboot -o $BUILD_TARGET == u-boot ];then
+	if [ $BUILD_TARGET == uboot -o $BUILD_TARGET == u-boot ];then
 		build_uboot
 		exit 0
 	elif [ $BUILD_TARGET == kernel ];then
