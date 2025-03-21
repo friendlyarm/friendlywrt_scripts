@@ -17,6 +17,7 @@ TOP_DIR=$(pwd)
 
 SDFUSE_DIR=$TOP_DIR/scripts/sd-fuse
 # The values of these variables will be overwritten in the.mk file
+true ${ENABLE_OVERLAYFS:=true}
 true ${ENABLE_OPT_PARTITION:=true}
 true ${FRIENDLYWRT_PACKAGE_DIR:=}
 declare -a FRIENDLYWRT_FILES=("")
@@ -296,11 +297,11 @@ function prepare_image_for_friendlyelec_eflasher(){
 			return 1
 		fi
 
+		[ -d ${ROOTFS_DIR}/opt ] || mkdir ${ROOTFS_DIR}/opt
 		if [ "${ENABLE_OPT_PARTITION}" = "true" ]; then
 			# create a new partition and mount it to the /opt directory
 			if [ -f ./tools/make-img.sh ]; then
 				log_info "prepare opt.img ..."
-				[ -d ${ROOTFS_DIR}/opt ] || mkdir ${ROOTFS_DIR}/opt
 				./tools/make-img.sh ${ROOTFS_DIR}/opt opt.img ${OS_DIR}
 				if [ $? -eq 0 ]; then
 					if [ -f /tmp/make-img-sh-result ]; then
@@ -395,6 +396,16 @@ EOL
 		if [ $? -ne 0 ]; then
 			log_error "error: fail to copy prebuilt images."
 			return 1
+		fi
+
+		if [ "${ENABLE_OVERLAYFS}" = "false" -a -f prebuilt/parameter.template ]; then
+			# remove userdata from parameter.txt and boot args
+			cp -f prebuilt/dtbo-plain.img ${OS_DIR}/dtbo.img
+			if [ "${ENABLE_OPT_PARTITION}" = "true" ]; then
+				sed -i -E 's/0x[0-9a-fA-F]+@(0x[0-9a-fA-F]+)\(userdata(:grow)?\),-@0x[0-9a-fA-F]+\(opt:grow\)/-@\1(opt:grow)/g' ${OS_DIR}/parameter.txt
+			else
+				cp -f prebuilt/parameter-plain.txt ${OS_DIR}/parameter.txt
+			fi
 		fi
 
 		return 0
