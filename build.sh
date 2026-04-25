@@ -153,7 +153,11 @@ function build_friendlywrt(){
 				if [ ${#ARR[@]} -eq 1 ]; then
 					# apply patch to friendlywrt root dir
 					log_info "Applying ${FRIENDLYWRT_PATCHS[$i]} to ${FRIENDLYWRT_SRC}"
-					git am -3 ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
+					if git apply --check "${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}" >/dev/null 2>&1; then
+						git am -3 ${TOP_DIR}/${FRIENDLYWRT_PATCHS[$i]}
+					else
+						log_info "Skip patch ${FRIENDLYWRT_PATCHS[$i]}: already applied or conflict."
+					fi
 				elif [ ${#ARR[@]} -eq 2 ]; then
 					# apply patch to sub dir
 					if [ -d ${TOP_DIR}/${ARR[1]} ]; then
@@ -161,14 +165,22 @@ function build_friendlywrt(){
 							PATCHS=$(ls)
 							cd ${TOP_DIR}/${FRIENDLYWRT_SRC}/${ARR[0]}
 							for FILE in ${PATCHS}; do
-								log_info "Applying ${FILE} to ${PWD}"
-								git am -3 ${TOP_DIR}/${ARR[1]}/${FILE}
+								if git apply --check "${TOP_DIR}/${ARR[1]}/${FILE}" >/dev/null 2>&1; then
+									log_info "Applying ${FILE} to ${PWD}"
+									git am -3 ${TOP_DIR}/${ARR[1]}/${FILE}
+								else
+									log_info "Skip patch ${FILE}: already applied or conflict."
+								fi
 							done
 						})
 					else
 						(cd ${ARR[0]} && {
-							log_info "Applying ${ARR[1]} to ${FRIENDLYWRT_SRC}/${ARR[0]}"
-							git am -3 ${TOP_DIR}/${ARR[1]}
+							if git apply --check "${TOP_DIR}/${ARR[1]}" >/dev/null 2>&1; then
+								log_info "Applying ${ARR[1]} to ${FRIENDLYWRT_SRC}/${ARR[0]}"
+								git am -3 ${TOP_DIR}/${ARR[1]}
+							else
+								log_info "Skip patch ${ARR[1]}: already applied or conflict."
+							fi
 						})
 					fi
 				else
@@ -243,6 +255,9 @@ function prepare_image_for_friendlyelec_eflasher(){
 	log_info "Copying ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS} to ${ROOTFS_DIR}/"
 	cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${FRIENDLYWRT_ROOTFS}/* ${ROOTFS_DIR}/
 
+	# Get OpenWrt's main version number
+	OPENWRT_MAJOR_VER=$(grep '^VERSION=' ${ROOTFS_DIR}/usr/lib/os-release | cut -d'"' -f2 | cut -d'.' -f1)
+
 	echo "$(date +%Y%m%d)" > ${ROOTFS_DIR}/etc/rom-version
 	for (( i=0; i<${#FRIENDLYWRT_FILES[@]}; i++ ));
 	do
@@ -269,9 +284,19 @@ function prepare_image_for_friendlyelec_eflasher(){
 	else
 		[ -d ${ROOTFS_DIR}/usr/local ] || mkdir ${ROOTFS_DIR}/usr/local
 		cp -af ${TOP_DIR}/${FRIENDLYWRT_SRC}/${PKG_DIR} ${ROOTFS_DIR}/usr/local
-		sed -i -e '/file\:\/\/usr\/local\/$(basename ${PKG_DIR})/d' ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
-		echo "src/gz friendlywrt_packages file://usr/local/$(basename ${PKG_DIR})" >> ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
-		sed -i '/check_signature/d' ${ROOTFS_DIR}/etc/opkg.conf
+		if [ "${OPENWRT_MAJOR_VER}" -ge 25 ]; then
+			# OpenWrt 25+: APK
+			sed "/kmods\/6.12/d" ${ROOTFS_DIR}/etc/apk/repositories.d/distfeeds.list -i
+			if [ ! -f ${ROOTFS_DIR}/etc/apk/keys/public-key.pem ]; then
+				cp ${TOP_DIR}/${FRIENDLYWRT_SRC}/public-key.pem ${ROOTFS_DIR}/etc/apk/keys/
+			fi
+			echo "file://usr/local/$(basename ${PKG_DIR})/packages.adb" > ${ROOTFS_DIR}/etc/apk/repositories.d/local.list
+		else
+			# OpenWrt 23/24: OPKG
+			sed -i -e '/file\:\/\/usr\/local\/$(basename ${PKG_DIR})/d' ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
+			echo "src/gz friendlywrt_packages file://usr/local/$(basename ${PKG_DIR})" >> ${ROOTFS_DIR}/etc/opkg/distfeeds.conf
+			sed -i '/check_signature/d' ${ROOTFS_DIR}/etc/opkg.conf
+		fi
 	fi
 
 	local BOOT_DIR=$(mktemp -d ${SDFUSE_DIR}/out/boot.XXXXXXXXX)
