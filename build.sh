@@ -360,7 +360,7 @@ if command -v sfdisk >/dev/null; then
 fi
 
 # resizefs opt partition
-parted \$DISK resizepart \$PARTNUM 100%
+parted -s \$DISK resizepart \$PARTNUM 100%
 e2fsck -fy \${PART}
 resize2fs -f \${PART}
 
